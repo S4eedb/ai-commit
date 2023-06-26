@@ -105,9 +105,9 @@ func run(diff string) error {
 	}
 }
 func getMessages(api *ChatGPTClient, request string) ([]string, error) {
-	spinner := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
-	spinner.Start()
-	defer spinner.Stop()
+	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+	s.Start()
+	defer s.Stop()
 
 	response, err := api.GetAnswer(request)
 	if err != nil {
