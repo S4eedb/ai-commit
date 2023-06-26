@@ -27,21 +27,28 @@ func PromptToken() (string, error) {
 	return answer.APIKey, nil
 }
 
+func getApiKey() (string, error) {
+	var apiKey string
+	if apiKey == "" {
+		var err error
+		apiKey, err = PromptToken()
+		if err != nil {
+			return "", err
+		}
+		err = SetAPIKey(apiKey)
+		if err != nil {
+			return "", err
+		}
+	}
+	return apiKey, nil
+}
+
 const (
 	GlobalConfigPath      = "${HOME}/.ai_commit.json"
 	DefaultModel          = "text-davinci-003"
 	DefaultTemperature    = 0.7
 	DefaultMaxTokens      = 200
-	DefaultPromptTemplate = `
-suggest 10 commit messages based on the following diff:
-{{diff}}
-commit messages should:
-- follow conventional commits
-- message format should be: <type>(scope): <description>
-
-examples:
-- fix(authentication): add password regex pattern
-- feat(storage): add new test cases`
+	DefaultPromptTemplate = `WW91IGFyZSBhbiBleHBlcnQgcHJvZ3JhbW1lciBzdW1tYXJpemluZyBhIGdpdCBkaWZmLgpSZW1pbmRlcnMgYWJvdXQgdGhlIGdpdCBkaWZmIGZvcm1hdDoKRm9yIGV2ZXJ5IGZpbGUsIHRoZXJlIGFyZSBhIGZldyBtZXRhZGF0YSBsaW5lcywgbGlrZSAoZm9yIGV4YW1wbGUpOgpgYGAKZGlmZiAtLWdpdCBhL2xpYi9pbmRleC5qcyBiL2xpYi9pbmRleC5qcwppbmRleCBhYWRmNjkxLi5iZmVmNjAzIDEwMDY0NAotLS0gYS9saWIvaW5kZXguanMKKysrIGIvbGliL2luZGV4LmpzCmBgYApUaGlzIG1lYW5zIHRoYXQgYGxpYi9pbmRleC5qc2Agd2FzIG1vZGlmaWVkIGluIHRoaXMgY29tbWl0LiBOb3RlIHRoYXQgdGhpcyBpcyBvbmx5IGFuIGV4YW1wbGUuClRoZW4gdGhlcmUgaXMgYSBzcGVjaWZpZXIgb2YgdGhlIGxpbmVzIHRoYXQgd2VyZSBtb2RpZmllZC4KQSBsaW5lIHN0YXJ0aW5nIHdpdGggYCtgIG1lYW5zIGl0IHdhcyBhZGRlZC4KQSBsaW5lIHRoYXQgc3RhcnRpbmcgd2l0aCBgLWAgbWVhbnMgdGhhdCBsaW5lIHdhcyBkZWxldGVkLgpBIGxpbmUgdGhhdCBzdGFydHMgd2l0aCBuZWl0aGVyIGArYCBub3IgYC1gIGlzIGNvZGUgZ2l2ZW4gZm9yIGNvbnRleHQgYW5kIGJldHRlciB1bmRlcnN0YW5kaW5nLgpJdCBpcyBub3QgcGFydCBvZiB0aGUgZGlmZi4KQWZ0ZXIgdGhlIGdpdCBkaWZmIG9mIHRoZSBmaXJzdCBmaWxlLCB0aGVyZSB3aWxsIGJlIGFuIGVtcHR5IGxpbmUsIGFuZCB0aGVuIHRoZSBnaXQgZGlmZiBvZiB0aGUgbmV4dCBmaWxlLgoKRG8gbm90IGluY2x1ZGUgdGhlIGZpbGUgbmFtZSBhcyBhbm90aGVyIHBhcnQgb2YgdGhlIGNvbW1lbnQuCkRvIG5vdCB1c2UgdGhlIGNoYXJhY3RlcnMgYFtgIG9yIGBdYCBpbiB0aGUgc3VtbWFyeS4KV3JpdGUgZXZlcnkgc3VtbWFyeSBjb21tZW50IGluIGEgbmV3IGxpbmUuCkNvbW1lbnRzIHNob3VsZCBiZSBpbiBhIGJ1bGxldCBwb2ludCBsaXN0LCBlYWNoIGxpbmUgc3RhcnRpbmcgd2l0aCBhIGAtYC4KVGhlIHN1bW1hcnkgc2hvdWxkIG5vdCBpbmNsdWRlIGNvbW1lbnRzIGNvcGllZCBmcm9tIHRoZSBjb2RlLgpUaGUgb3V0cHV0IHNob3VsZCBiZSBlYXNpbHkgcmVhZGFibGUuIFdoZW4gaW4gZG91YnQsIHdyaXRlIGZld2VyIGNvbW1lbnRzIGFuZCBub3QgbW9yZS4gRG8gbm90IG91dHB1dCBjb21tZW50cyB0aGF0CnNpbXBseSByZXBlYXQgdGhlIGNvbnRlbnRzIG9mIHRoZSBmaWxlLgpSZWFkYWJpbGl0eSBpcyB0b3AgcHJpb3JpdHkuIFdyaXRlIG9ubHkgdGhlIG1vc3QgaW1wb3J0YW50IGNvbW1lbnRzIGFib3V0IHRoZSBkaWZmLgoKRVhBTVBMRSBTVU1NQVJZIENPTU1FTlRTOgpgYGAKLSBSYWlzZSB0aGUgYW1vdW50IG9mIHJldHVybmVkIHJlY29yZGluZ3MgZnJvbSBgMTBgIHRvIGAxMDBgCi0gRml4IGEgdHlwbyBpbiB0aGUgZ2l0aHViIGFjdGlvbiBuYW1lCi0gTW92ZSB0aGUgYG9jdG9raXRgIGluaXRpYWxpemF0aW9uIHRvIGEgc2VwYXJhdGUgZmlsZQotIEFkZCBhbiBPcGVuQUkgQVBJIGZvciBjb21wbGV0aW9ucwotIExvd2VyIG51bWVyaWMgdG9sZXJhbmNlIGZvciB0ZXN0IGZpbGVzCi0gQWRkIDIgdGVzdHMgZm9yIHRoZSBpbmNsdXNpdmUgc3RyaW5nIHNwbGl0IGZ1bmN0aW9uCmBgYApNb3N0IGNvbW1pdHMgd2lsbCBoYXZlIGxlc3MgY29tbWVudHMgdGhhbiB0aGlzIGV4YW1wbGVzIGxpc3QuClRoZSBsYXN0IGNvbW1lbnQgZG9lcyBub3QgaW5jbHVkZSB0aGUgZmlsZSBuYW1lcywKYmVjYXVzZSB0aGVyZSB3ZXJlIG1vcmUgdGhhbiB0d28gcmVsZXZhbnQgZmlsZXMgaW4gdGhlIGh5cG90aGV0aWNhbCBjb21taXQuCkRvIG5vdCBpbmNsdWRlIHBhcnRzIG9mIHRoZSBleGFtcGxlIGluIHlvdXIgc3VtbWFyeS4KSXQgaXMgZ2l2ZW4gb25seSBhcyBhbiBleGFtcGxlIG9mIGFwcHJvcHJpYXRlIGNvbW1lbnRzLgoKClRIRSBHSVQgRElGRiBUTyBCRSBTVU1NQVJJWkVEOgpgYGAKe3tkaWZmfX0KYGBgCgpUSEUgU1VNTUFSWTo=`
 )
 
 type Config struct {
@@ -52,56 +59,66 @@ type Config struct {
 	MaxTokens      int     `json:"maxTokens,omitempty"`
 }
 
-func SetAPIKey(key string) error {
+func LoadGlobalConfig() (*Config, error) {
 	globalConfigPath := os.ExpandEnv(GlobalConfigPath)
 	if _, err := os.Stat(globalConfigPath); os.IsNotExist(err) {
-		// Create the directory if it doesn't exist
-		err := os.MkdirAll(filepath.Dir(globalConfigPath), 0755)
-		if err != nil {
-			return err
-		}
-
-		// Write the JSON data to the file
-		jsonData, err := json.MarshalIndent(Config{
-			APIKey:         key,
+		return &Config{
+			APIKey:         "",
 			PromptTemplate: DefaultPromptTemplate,
 			Model:          DefaultModel,
 			Temperature:    DefaultTemperature,
 			MaxTokens:      DefaultMaxTokens,
-		}, "", "  ")
-		if err != nil {
-			return err
-		}
-		err = os.WriteFile(globalConfigPath, jsonData, 0644)
-		if err != nil {
-			return err
-		}
-		return nil
+		}, nil
+	} else if err != nil {
+		return nil, err
 	} else {
-		// Read the file
 		jsonData, err := os.ReadFile(globalConfigPath)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		// Unmarshal the JSON data
 		var config Config
 		err = json.Unmarshal(jsonData, &config)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		// Update the API key
-		config.APIKey = key
-
-		// Write the JSON data to the file
-		err = writeJsonFile(globalConfigPath, config)
-		if err != nil {
-			return err
+		if config.PromptTemplate == "" {
+			config.PromptTemplate = DefaultPromptTemplate
 		}
-		return nil
+		if config.Model == "" {
+			config.Model = DefaultModel
+		}
+		if config.Temperature == 0 {
+			config.Temperature = DefaultTemperature
+		}
+		if config.MaxTokens == 0 {
+			config.MaxTokens = DefaultMaxTokens
+		}
 
+		return &config, nil
 	}
+}
+
+func SetAPIKey(key string) error {
+	globalConfigPath := os.ExpandEnv(GlobalConfigPath)
+
+	// Load the config file
+	config, err := LoadGlobalConfig()
+	if err != nil {
+		return err
+	}
+
+	// Update the API key
+	config.APIKey = key
+
+	// Write the JSON data to the file
+	err = writeJsonFile(globalConfigPath, config)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func writeJsonFile(path string, data interface{}) error {
@@ -122,33 +139,4 @@ func writeJsonFile(path string, data interface{}) error {
 	}
 
 	return nil
-}
-
-func loadConfig() (*Config, error) {
-	globalConfigPath := os.ExpandEnv(GlobalConfigPath)
-	if _, err := os.Stat(globalConfigPath); os.IsNotExist(err) {
-		// If the file doesn't exist, return the default config
-		return &Config{
-			APIKey:         "",
-			PromptTemplate: DefaultPromptTemplate,
-			Model:          DefaultModel,
-			Temperature:    DefaultTemperature,
-			MaxTokens:      DefaultMaxTokens,
-		}, nil
-	} else {
-		// Read the file
-		jsonData, err := os.ReadFile(globalConfigPath)
-		if err != nil {
-			return nil, err
-		}
-
-		// Unmarshal the JSON data
-		var config Config
-		err = json.Unmarshal(jsonData, &config)
-		if err != nil {
-			return nil, err
-		}
-
-		return &config, nil
-	}
 }

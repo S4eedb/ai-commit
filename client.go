@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
@@ -60,7 +61,7 @@ func run(diff string) error {
 	if diffTokens > maxDiffTokens {
 		diff = strings.Join(strings.Fields(diff)[:maxPromptTokens], " ")
 	}
-	config, err := loadConfig()
+	config, err := LoadGlobalConfig()
 	if err != nil {
 		fmt.Println("Failed to load config:", err)
 		os.Exit(1)
@@ -82,8 +83,10 @@ func run(diff string) error {
 	}
 
 	api := NewChatGPTClient(apiKey)
-
-	prompt := strings.ReplaceAll(DefaultPromptTemplate, "{{diff}}", "```\n"+diff+"\n```")
+	// load prompt from file
+	// decpde  base 64 to string
+	decode, err := base64.StdEncoding.DecodeString(DefaultPromptTemplate)
+	prompt := strings.ReplaceAll(string(decode), "{{diff}}", "```\n"+diff+"\n```")
 
 	for {
 		choices, err := getMessages(api, prompt)
