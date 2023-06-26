@@ -4,9 +4,6 @@
 build:
 	go build -o ai-commit
 
-.PHONY: test
-test:
-	go test ./...
 
 .PHONY: clean
 clean:
