@@ -153,26 +153,13 @@ func getMessages(api *ChatGPTClient, request string) ([]string, error) {
 }
 
 func parseStringList(message string) ([]string, error) {
-	var commitMessages []string
+	//commitMessages := make([]string, 0)
 
 	lines := strings.Split(message, "\n")
-	for _, line := range lines {
-		// Ignore empty lines and lines that don't contain a commit message
-		line = strings.TrimSpace(line)
-		if line == "" || !strings.Contains(line, "(") || !strings.Contains(line, ")") {
-			continue
-		}
 
-		// Add the commit message to the result
-		commitMessages = append(commitMessages, line)
-	}
-
-	if len(commitMessages) == 0 {
-		return nil, errors.New("no valid commit messages found")
-	}
-
-	return commitMessages, nil
+	return lines, nil
 }
+
 func normalizeMessage(line string) string {
 	// Trim whitespace and common prefixes
 	line = strings.TrimSpace(strings.TrimPrefix(line, "- "))
