@@ -4,16 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/briandowns/spinner"
+	"github.com/sashabaranov/go-openai"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 	"unicode"
-
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/briandowns/spinner"
-	"github.com/sashabaranov/go-openai"
 )
 
 type ChatGPTClient struct {
@@ -27,15 +26,11 @@ func NewChatGPTClient(apiKey string) *ChatGPTClient {
 }
 
 func (c *ChatGPTClient) GetAnswer(question string) (string, error) {
-	model := getConfig("model").(string)
-	maxTokens := getConfig("maxTokens").(int)
-	temperature := getConfig("temperature").(float32)
-
 	req := openai.CompletionRequest{
-		Model:       model,
-		MaxTokens:   maxTokens,
+		Model:       DefaultModel,
+		MaxTokens:   DefaultMaxTokens,
 		Prompt:      question,
-		Temperature: temperature,
+		Temperature: DefaultTemperature,
 	}
 
 	resp, err := c.client.CreateCompletion(context.Background(), req)
@@ -49,8 +44,6 @@ func (c *ChatGPTClient) GetAnswer(question string) (string, error) {
 
 	return resp.Choices[0].Text, nil
 }
-
-const CUSTOM_MESSAGE_OPTION = "[write own message]..."
 
 func run(diff string) error {
 	const maxDiffTokens = 2000
@@ -69,11 +62,7 @@ func run(diff string) error {
 	}
 	api := NewChatGPTClient(apiKey)
 
-	prompt, err := loadPromptTemplate()
-	if err != nil {
-		return err
-	}
-	prompt = strings.ReplaceAll(prompt, "{{diff}}", "```\n"+diff+"\n```")
+	prompt := strings.ReplaceAll(DefaultPromptTemplate, "{{diff}}", "```\n"+diff+"\n```")
 
 	for {
 		choices, err := getMessages(api, prompt)
