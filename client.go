@@ -50,8 +50,8 @@ func (c *ChatGPTClient) GetAnswer(question string) (string, error) {
 
 func run(diff string) error {
 	const (
-		maxDiffTokens    = 2000
-		maxPromptTokens  = 700
+		maxDiffTokens    = 400
+		maxPromptTokens  = 400
 		customMessageOpt = "Enter a custom message"
 	)
 
