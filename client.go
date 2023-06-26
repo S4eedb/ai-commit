@@ -32,6 +32,9 @@ func (c *ChatGPTClient) GetAnswer(question string) (string, error) {
 		Prompt:      question,
 		Temperature: DefaultTemperature,
 	}
+	fmt.Println("Sending request to OpenAI API...")
+	// question
+	fmt.Println("Question: ", question)
 
 	resp, err := c.client.CreateCompletion(context.Background(), req)
 	if err != nil {
@@ -46,20 +49,38 @@ func (c *ChatGPTClient) GetAnswer(question string) (string, error) {
 }
 
 func run(diff string) error {
-	const maxDiffTokens = 2000
-	const maxPromptTokens = 700
-	const customMessageOption = "Enter a custom message"
+	const (
+		maxDiffTokens    = 2000
+		maxPromptTokens  = 700
+		customMessageOpt = "Enter a custom message"
+	)
 
 	// Trim the diff to the maximum number of tokens
 	diffTokens := len(strings.Fields(diff))
 	if diffTokens > maxDiffTokens {
 		diff = strings.Join(strings.Fields(diff)[:maxPromptTokens], " ")
 	}
-
-	apiKey, err := getApiKey()
+	config, err := loadConfig()
 	if err != nil {
-		return err
+		fmt.Println("Failed to load config:", err)
+		os.Exit(1)
 	}
+
+	apiKey := config.APIKey
+	if apiKey == "" {
+		var err error
+		apiKey, err := PromptToken()
+		if err != nil {
+			fmt.Println("Failed to get API key:", err)
+			os.Exit(1)
+		}
+		err = SetAPIKey(apiKey)
+		if err != nil {
+			fmt.Println("Failed to set API key:", err)
+			os.Exit(1)
+		}
+	}
+
 	api := NewChatGPTClient(apiKey)
 
 	prompt := strings.ReplaceAll(DefaultPromptTemplate, "{{diff}}", "```\n"+diff+"\n```")
@@ -69,56 +90,54 @@ func run(diff string) error {
 		if err != nil {
 			return err
 		}
-		choices = append(choices, customMessageOption)
+		choices = append(choices, customMessageOpt)
 
 		var message string
 		prompt := &survey.Select{
 			Message: "Pick a message",
 			Options: choices,
 		}
-		err = survey.AskOne(prompt, &message)
-		if err != nil {
+		if err = survey.AskOne(prompt, &message); err != nil {
 			return err
 		}
 
-		if message == customMessageOption {
+		if message == customMessageOpt {
 			cmd := exec.Command("git", "commit")
-			cmd.Stdout = os.Stdout
-			cmd.Stdin = os.Stdin
-			cmd.Stderr = os.Stderr
-			err = cmd.Run()
-			if err != nil {
+			cmd.Stdout, cmd.Stdin, cmd.Stderr = os.Stdout, os.Stdin, os.Stderr
+			if err = cmd.Run(); err != nil {
 				return err
 			}
 			return nil
 		}
 
 		cmd := exec.Command("git", "commit", "-m", escapeCommitMessage(message))
-		cmd.Stdout = os.Stdout
-		cmd.Stdin = os.Stdin
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		if err != nil {
+		cmd.Stdout, cmd.Stdin, cmd.Stderr = os.Stdout, os.Stdin, os.Stderr
+		if err = cmd.Run(); err != nil {
 			return err
 		}
 		return nil
 	}
 }
+
 func getMessages(api *ChatGPTClient, request string) ([]string, error) {
 	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
 	s.Start()
 	defer s.Stop()
 
+	// Call the OpenAI API to get the response
 	response, err := api.GetAnswer(request)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("Response: ", response)
 
+	// Parse the response into a list of commit messages
 	messages, err := parseStringList(response)
 	if err != nil {
-		println(err)
+		return nil, err
 	}
 
+	// Normalize and filter the commit messages
 	var choices []string
 	for _, message := range messages {
 		message = normalizeMessage(message)
@@ -135,9 +154,9 @@ func parseStringList(message string) ([]string, error) {
 
 	lines := strings.Split(message, "\n")
 	for _, line := range lines {
-		// Ignore empty lines and lines that don't start with a number
+		// Ignore empty lines and lines that don't contain a commit message
 		line = strings.TrimSpace(line)
-		if line == "" || !unicode.IsDigit(rune(line[0])) {
+		if line == "" || !strings.Contains(line, "(") || !strings.Contains(line, ")") {
 			continue
 		}
 
@@ -152,29 +171,33 @@ func parseStringList(message string) ([]string, error) {
 	return commitMessages, nil
 }
 func normalizeMessage(line string) string {
-	line = strings.TrimSpace(line)
-	prefixes := []string{"- ", "* ", "+ ", "> ", "# ", "~ ", ": ", "| ", "• ", "▸ "}
-	for _, prefix := range prefixes {
-		line = strings.TrimPrefix(line, prefix)
-	}
-	suffixes := []string{"`", `"`, `'`, `:`}
-	for _, suffix := range suffixes {
-		line = strings.TrimSuffix(line, suffix)
-	}
-	if line != "" {
-		// Find the first non-digit character
-		i := 0
-		for i < len(line) && unicode.IsDigit(rune(line[i])) {
-			i++
-		}
-		if i < len(line) {
-			// Remove the number and any leading whitespace
+	// Trim whitespace and common prefixes
+	line = strings.TrimSpace(strings.TrimPrefix(line, "- "))
+	line = strings.TrimSpace(strings.TrimPrefix(line, "* "))
+	line = strings.TrimSpace(strings.TrimPrefix(line, "+ "))
+	line = strings.TrimSpace(strings.TrimPrefix(line, "> "))
+	line = strings.TrimSpace(strings.TrimPrefix(line, "# "))
+	line = strings.TrimSpace(strings.TrimPrefix(line, "~ "))
+	line = strings.TrimSpace(strings.TrimPrefix(line, ": "))
+	line = strings.TrimSpace(strings.TrimPrefix(line, "| "))
+	line = strings.TrimSpace(strings.TrimPrefix(line, "• "))
+	line = strings.TrimSpace(strings.TrimPrefix(line, "▸ "))
+
+	// Trim common suffixes
+	line = strings.TrimSuffix(line, "`")
+	line = strings.TrimSuffix(line, "\"")
+	line = strings.TrimSuffix(line, "'")
+	line = strings.TrimSuffix(line, ":")
+
+	// Remove any leading numbers and whitespace
+	for i := 0; i < len(line); i++ {
+		if !unicode.IsDigit(rune(line[i])) {
 			line = strings.TrimSpace(line[i:])
+			break
 		}
 	}
 
-	line = strings.TrimSpace(line)
-	return line
+	return strings.TrimSpace(line)
 }
 
 func escapeCommitMessage(message string) string {

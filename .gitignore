@@ -7,3 +7,23 @@
 /dataSources/
 /dataSources.local.xml
 /.idea
+# Ignore binary files
+ai-commit
+
+# Ignore go test cache files
+*.test
+
+# Ignore temporary files
+*~
+.*.swp
+.DS_Store
+
+# Ignore go module build cache
+*.exe
+*.test
+*.prof
+vendor/
+!vendor/github.com/bai/
+
+# Ignore environment files
+.env
